@@ -249,6 +249,96 @@ def _plot_cls_brazil(summary, plot_dir):
     plt.close(fig)
 
 
+def _plot_feldman_cousins_construction(summary, plot_dir):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fc = summary.get("feldman_cousins")
+    if not isinstance(fc, dict):
+        return
+
+    grid = fc.get("grid", {})
+    if not isinstance(grid, dict):
+        return
+
+    poi = np.asarray(grid.get("poi", []), dtype=float)
+    q_obs = np.asarray(grid.get("q_obs", []), dtype=float)
+    q_crit = np.asarray(grid.get("q_crit", []), dtype=float)
+    if poi.size == 0:
+        return
+
+    valid_obs = np.isfinite(poi) & np.isfinite(q_obs)
+    valid_crit = np.isfinite(poi) & np.isfinite(q_crit)
+    if not np.any(valid_obs) and not np.any(valid_crit):
+        return
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+
+    if np.any(valid_obs):
+        ax.plot(
+            poi[valid_obs],
+            q_obs[valid_obs],
+            color="#1F77B4",
+            linewidth=2.0,
+            marker="o",
+            markersize=3.5,
+            label=r"$q_\mu^{obs}$",
+        )
+
+    if np.any(valid_crit):
+        ax.plot(
+            poi[valid_crit],
+            q_crit[valid_crit],
+            color="#D62728",
+            linewidth=2.0,
+            marker="s",
+            markersize=3.0,
+            linestyle="--",
+            label=r"$q_\mu^{crit}$",
+        )
+
+    both = np.isfinite(poi) & np.isfinite(q_obs) & np.isfinite(q_crit)
+    accepted = both & (q_obs <= q_crit)
+    if np.any(accepted):
+        ax.scatter(
+            poi[accepted],
+            q_obs[accepted],
+            color="#2CA02C",
+            s=24,
+            zorder=4,
+            label="Accepted grid points",
+        )
+
+    interval = fc.get("fc_interval")
+    if isinstance(interval, list) and len(interval) == 2:
+        lo = float(interval[0])
+        hi = float(interval[1])
+        if np.isfinite(lo) and np.isfinite(hi) and hi >= lo:
+            ax.axvspan(lo, hi, color="#A1D99B", alpha=0.22, label="FC interval")
+            ax.axvline(lo, color="#2CA02C", linestyle=":", linewidth=1.3)
+            ax.axvline(hi, color="#2CA02C", linestyle=":", linewidth=1.3)
+
+    alpha = fc.get("alpha")
+    title = "Feldman-Cousins Construction"
+    if alpha is not None:
+        try:
+            title += f" (alpha={float(alpha):.3g})"
+        except Exception:
+            pass
+    ax.set_title(title)
+    ax.set_xlabel(fc.get("poi_name", summary.get("poi_name", "POI")))
+    ax.set_ylabel(r"$q_\mu$")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="best")
+
+    plt.tight_layout()
+    out = os.path.join(plot_dir, f"dataset_{summary.get('dataset_id', 0)}_feldman_cousins.png")
+    plt.savefig(out, dpi=150)
+    plt.close(fig)
+
+
 def plot_summary_artifacts(summaries, fit_model, plot_dir, binned_bins):
     _ = fit_model
     _ = binned_bins
@@ -290,3 +380,4 @@ def plot_summary_artifacts(summaries, fit_model, plot_dir, binned_bins):
         _plot_first_dataset_channels(summaries[0], plot_dir)
         _plot_delta_nll(summaries[0], plot_dir)
         _plot_cls_brazil(summaries[0], plot_dir)
+        _plot_feldman_cousins_construction(summaries[0], plot_dir)

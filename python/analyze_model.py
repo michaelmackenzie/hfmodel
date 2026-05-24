@@ -62,15 +62,15 @@ def _print_dataset_summary(summary, is_observed_fit=False):
         q = summary["cls_expected_quantiles"]
         print(
             "  CLs expected: "
-            f"2.5%={q.get('2.5%')}, 16%={q.get('16%')}, 50%={q.get('50%')}, "
-            f"84%={q.get('84%')}, 97.5%={q.get('97.5%')}"
+            f"2.5%={q.get('2.5%'):.4g}, 16%={q.get('16%'):.4g}, 50%={q.get('50%'):.4g}, "
+            f"84%={q.get('84%'):.4g}, 97.5%={q.get('97.5%'):.4g}"
         )
     if "cls_error" in summary:
         print(f"  CLs failed: {summary['cls_error']}")
     if isinstance(summary.get("feldman_cousins"), dict):
         fc = summary["feldman_cousins"]
         if fc.get("fc_interval") is not None:
-            print(f"  Feldman-Cousins interval: {fc.get('fc_interval')}")
+            print(f"  Feldman-Cousins interval: {[float(f'{x:.4g}') for x in fc.get('fc_interval')]}")
         elif fc.get("fc_status"):
             print(f"  Feldman-Cousins status: {fc.get('fc_status')}")
 
@@ -129,11 +129,11 @@ def _build_ensemble_evaluation_report(summaries, total_time_s):
     return report
 
 
-def _save_ensemble_report(report, output_pkl, report_file=None):
+def _save_ensemble_report(report, output, report_file=None):
     if report_file:
         output_path = os.path.abspath(report_file)
     else:
-        base, _ = os.path.splitext(os.path.abspath(output_pkl))
+        base, _ = os.path.splitext(os.path.abspath(output))
         output_path = f"{base}_ensemble_report.json"
 
     with open(output_path, "w", encoding="utf-8") as handle:
@@ -255,7 +255,7 @@ def run_analysis_cli(args):
         feldman_cousins_scan_max=args.fc_scan_max,
         progress_callback=_print_dataset_summary,
         checkpoint_freq=args.checkpoint_freq,
-        checkpoint_path=(f"{args.output_pkl}.checkpoint.json" if args.checkpoint_freq else None),
+        checkpoint_path=(f"{args.output}.checkpoint.json" if args.checkpoint_freq else None),
         existing_results=[],
         resume_from_index=0,
         compute_nll_scan=args.plot,
@@ -290,18 +290,18 @@ def run_analysis_cli(args):
         )
         print(f"Saved plots to: {os.path.abspath(args.plot_dir)}")
 
-    output_pkl = args.output_pkl or f"analysis_output_{args.seed}.json"
+    output = args.output or f"analysis_output_{args.seed}.json"
 
     ensemble_report = _build_ensemble_evaluation_report(summaries=summaries, total_time_s=total_time_s)
     report_path = _save_ensemble_report(
         report=ensemble_report,
-        output_pkl=output_pkl,
+        output=output,
         report_file=args.report_file,
     )
     print(f"Saved ensemble evaluation report to: {report_path}")
 
     snapshot_path = _save_analysis_snapshot(
-        output_path=output_pkl,
+        output_path=output,
         fit_model=fit_model,
         summaries=summaries,
         args=args,
