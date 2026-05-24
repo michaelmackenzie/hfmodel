@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
-
-import dill
 
 
 @dataclass
@@ -154,11 +153,11 @@ def detect_card_flavor(card_path: str) -> str:
     tokens = _read_tokens(card_path)
     has_header = any(fields[0].lower() in ("imax", "jmax", "kmax") for fields in tokens)
     has_root_shapes = any(fields[0].lower() == "shapes" and any(token.endswith(".root") for token in fields) for fields in tokens)
-    has_pkl_shapes = any(fields[0].lower() == "shapes" and any(token.endswith(".pkl") for token in fields) for fields in tokens)
+    has_json_shapes = any(fields[0].lower() == "shapes" and any(token.endswith(".json") for token in fields) for fields in tokens)
 
     if has_header or has_root_shapes:
         return "combine"
-    if has_pkl_shapes:
+    if has_json_shapes:
         return "hfmodel"
     raise ValueError("Could not infer card flavor; use --direction explicitly")
 
@@ -168,8 +167,8 @@ def _default_shapes_file_from_combine(parsed: ParsedCard) -> str:
         if shape.process.lower() == "data_obs":
             continue
         if shape.file_path.endswith(".root"):
-            return os.path.splitext(shape.file_path)[0] + ".pkl"
-    return "converted_shapes.pkl"
+            return os.path.splitext(shape.file_path)[0] + ".json"
+    return "converted_shapes.json"
 
 
 def _clean_workspace_expr(expr: str) -> str:
@@ -199,8 +198,8 @@ def _load_workspace_name_mapping(shapes_file: str, card_dir: str) -> Dict[str, s
         shape_path = os.path.abspath(os.path.join(card_dir, shape_path))
 
     try:
-        with open(shape_path, "rb") as handle:
-            payload = dill.load(handle)
+        with open(shape_path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
     except Exception:
         return {}
 
@@ -393,8 +392,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--shapes-file",
         default=None,
         help=(
-            "Target .pkl shapes file for combine-to-hfmodel conversion. "
-            "If omitted, defaults to the first Combine shapes ROOT file with .pkl extension."
+            "Target .json shapes file for combine-to-hfmodel conversion. "
+            "If omitted, defaults to the first Combine shapes ROOT file with .json extension."
         ),
     )
     parser.add_argument(
@@ -411,7 +410,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Target ROOT file for hfmodel-to-combine conversion. "
-            "If omitted, defaults to replacing the first hfmodel shapes .pkl path with .root."
+            "If omitted, defaults to replacing the first hfmodel shapes .json path with .root."
         ),
     )
     parser.add_argument(
@@ -442,7 +441,7 @@ def _default_root_file_from_hfmodel(parsed: ParsedCard) -> str:
     for shape in parsed.shapes:
         if shape.process.lower() == "data_obs":
             continue
-        if shape.file_path.endswith(".pkl"):
+        if shape.file_path.endswith(".json"):
             return os.path.splitext(shape.file_path)[0] + ".root"
     return "converted_workspace.root"
 

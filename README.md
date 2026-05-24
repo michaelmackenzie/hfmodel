@@ -73,15 +73,15 @@ plot_analysis.py analysis_output.json --plot-dir plots_from_snapshot
 Convert RooFit workspaces in a ROOT file into pyhf binned payloads that can be used as `shapes` inputs:
 
 ```bash
-python python/convert_rooworkspace_shapes.py input.root --output-dir shapes
+python python/convert_rooworkspace_shapes.py input.root --output-dir shapes --bins 60
 ```
 
-The converter writes one pickle per `RooWorkspace` and produces binned distributions for unbinned inputs.
+The converter writes a pyhf workspace JSON and produces binned distributions for unbinned inputs using user-provided binning (`--bins` or `--bin-edges`). Existing binned RooHistPdf inputs keep their native binning.
 
-The same module also exposes helper functions for the reverse direction, converting pyhf parameters, datasets, and PDFs back into RooFit objects when needed. To export a saved pyhf analysis snapshot back into a ROOT file containing a `RooWorkspace`, use:
+To export a saved hfmodel/pyhf model back into a ROOT file containing a `RooWorkspace` with RooHistPdf objects, use:
 
 ```bash
-python python/convert_rooworkspace_shapes.py analysis_output.json --output-root workspace.root
+python python/convert_rooworkspace_shapes.py model.json --output-root workspace.root --workspace-name workspace
 ```
 
 Convert text cards between Combine and hfmodel formats:
@@ -91,7 +91,7 @@ Convert text cards between Combine and hfmodel formats:
 python python/convert_datacard_format.py \
 	/exp/mu2e/app/users/mmackenz/conv/ConvAna/analysis/datacards/combine_mumem_20_r0102.txt \
 	examples/mumem_20_hfmodel_card.txt \
-	--shapes-file shapes/workspace_mumem_20_r0102.pkl
+	--shapes-file shapes/workspace_mumem_20_r0102.json
 
 # hfmodel -> Combine
 python python/convert_datacard_format.py \
