@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+import argparse
+import importlib
+import pathlib
+import sys
+
+# Allow importing project modules when running from scripts/.
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+REPO_PARENT = REPO_ROOT.parent
+if str(REPO_PARENT) not in sys.path:
+    sys.path.insert(0, str(REPO_PARENT))
+
+
+def _package_version(module_name, fallback="unknown"):
+    try:
+        module = importlib.import_module(module_name)
+    except Exception:
+        return fallback
+    return getattr(module, "__version__", fallback)
+
+
+def _print_startup_header():
+    from hfmodel import __version__ as hfmodel_version
+
+    pyhf_version = _package_version("pyhf")
+    version_string = f"* hfmodel {hfmodel_version} | pyhf {pyhf_version} *"
+    print('*' * len(version_string), flush=True)
+    print('*' + 'hfmodel statistical analysis'.center(len(version_string) - 2) + '*', flush=True)
+    print(version_string, flush=True)
+    print('*' * len(version_string), flush=True)
+
+
+def _add_analyze_arguments(parser):
+    parser.add_argument(
+        "--backend",
+        choices=("scipy", "minuit", "jax"),
+        default="scipy",
+        help="pyhf optimizer backend: scipy (default), minuit, or jax",
+    )
+    parser.add_argument(
+        "--hessian-method",
+        choices=("auto", "manual", "minuit", "jax"),
+        default="auto",
+        help="Hessian extraction strategy: auto (backend-aware), manual finite-difference, minuit, or jax",
+    )
+    parser.add_argument(
+        "--feldman-cousins", "-fc",
+        type=float,
+        default=None,
+        metavar="ALPHA",
+        help="If set, compute Feldman-Cousins confidence intervals using this alpha value (e.g. 0.1 for 90%% CL)",
+    )
+    parser.add_argument(
+        "--fc-scan-points",
+        type=int,
+        default=21,
+        help="Number of POI grid points for Feldman-Cousins construction",
+    )
+    parser.add_argument(
+        "--fc-toys",
+        type=int,
+        default=100,
+        help="Number of toys per POI grid point for Feldman-Cousins construction",
+    )
+    parser.add_argument(
+        "--fc-scan-max",
+        type=float,
+        default=None,
+        help="Optional POI scan maximum for Feldman-Cousins (default: automatic)",
+    )
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--model-file", "-m", type=str, help="Path to a saved model file (default format: .pkl)")
+    source.add_argument("--input-card", "-c", type=str, help="Path to a text model card")
+    parser.add_argument(
+        "--toys", "-t",
+        type=int,
+        default=None,
+        help="Number of toy datasets to generate and fit (default: use observed data if available, otherwise 1; use -1 for binned Asimov data)",
+    )
+    parser.add_argument(
+        "--jobs", "-j",
+        type=int,
+        default=1,
+        help="Number of parallel worker processes for toy generation/fits (default: 1, no parallel processing)",
+    )
+    parser.add_argument("--cls", type=float, default=None, help="If set, compute the CLs upper limit for this alpha value")
+    parser.add_argument("--signal-strength", type=float, default=None, help="Override the signal strength before generating toys")
+    parser.add_argument("--scan-max", type=float, default=None, help="Override the maximum signal scan value for CLs")
+    parser.add_argument(
+        "--cls-scan-points",
+        type=int,
+        default=None,
+        help="Number of scan points for CLs (default: 9 for counting+binned, else 25)",
+    )
+    parser.add_argument(
+        "--cls-smart-scan",
+        action="store_true",
+        help="Adaptively refine the CLs scan range and granularity around the limit",
+    )
+    parser.add_argument(
+        "--fit-mode",
+        choices=("auto", "binned"),
+        default="auto",
+        help="Likelihood type: auto (default) or binned",
+    )
+    parser.add_argument(
+        "--binned-bins",
+        type=int,
+        default=40,
+        help="Number of bins for non-counting binned fits",
+    )
+    parser.add_argument(
+        "--checkpoint-freq",
+        type=int,
+        default=None,
+        help="Save checkpoint every N datasets for progress tracking and recovery (default: no checkpoints)",
+    )
+    parser.add_argument(
+        "--resume-from",
+        type=str,
+        default=None,
+        help="Resume analysis from a previous checkpoint file (loads completed datasets and continues from index N+1)",
+    )
+    parser.add_argument(
+        "--profile-scan",
+        action="store_true",
+        help="For counting+binned fits, run a profile-likelihood scan over the POI instead of full minimization",
+    )
+    parser.add_argument(
+        "--poi-name",
+        default=None,
+        help="Optional parameter name to treat as parameter of interest (POI) for --profile-scan",
+    )
+    parser.add_argument(
+        "--promote-poi",
+        action="store_true",
+        help="If --poi-name points to a fixed parameter, set it floating so it can be used as POI",
+    )
+    parser.add_argument(
+        "--poi-scan-points",
+        type=int,
+        default=41,
+        help="Number of scan points for --profile-scan",
+    )
+    parser.add_argument(
+        "--poi-scan-max",
+        type=float,
+        default=None,
+        help="Optional upper edge for POI scan (lower edge uses POI lower bound/default)",
+    )
+    parser.add_argument(
+        "--plot",
+        "--plots",
+        action="store_true",
+        help="Save histogram plots of fit parameters, POI pull, and per-toy fit distributions",
+    )
+    parser.add_argument(
+        "--nll-scan-points",
+        type=int,
+        default=121,
+        help="Number of points in the profile-NLL scan used for --plot (default: 121)",
+    )
+    parser.add_argument(
+        "--plot-dir",
+        type=str,
+        default="plots",
+        help="Output directory for --plot artifacts",
+    )
+    parser.add_argument(
+        "--set-parameters",
+        type=str,
+        default=None,
+        help="Optional parameter settings to override the input model, e.g. 'param1=1.5,param2=2.0'",
+    )
+    parser.add_argument(
+        "--freeze-parameters",
+        type=str,
+        default=None,
+        help="Optional parameter list to freeze in the model, e.g. 'param1,param2'",
+    )
+    parser.add_argument(
+        "--set-parameter-ranges",
+        type=str,
+        default=None,
+        help="Optional parameter ranges to override the input model, e.g. 'param1=0.5:2.0,param2=1.0:3.0'",
+    )
+    parser.add_argument(
+        "--output-pkl",
+        type=str,
+        default="analysis_output.pkl",
+        help="Output analysis snapshot path (JSON is written)",
+    )
+    parser.add_argument(
+        "--report-file",
+        type=str,
+        default=None,
+        help="Optional JSON file path for ensemble evaluation report (default: derived from --output-pkl)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=1234,
+        help="Random seed for reproducible toy generation and minimization settings",
+    )
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="Top-level CLI for hfmodel workflows")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    build_parser = subparsers.add_parser("build", help="Build and save a pyhf model from a text card")
+    build_parser.add_argument("input_card", help="Path to the model-card text file")
+    build_parser.add_argument(
+        "output_file",
+        nargs="?",
+        default="model.json",
+        help="Path to the output model file (default: model.json)",
+    )
+
+    load_parser = subparsers.add_parser("load", help="Load and summarize a saved model bundle")
+    load_parser.add_argument("model_file", help="Path to the saved model file")
+    load_parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase load output detail; use -vv for PDF and variable listings",
+    )
+
+    analyze_parser = subparsers.add_parser("analyze", help="Run toy fits and optional CLs limits")
+    _add_analyze_arguments(analyze_parser)
+
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    _print_startup_header()
+
+
+    if args.command == "build":
+        from hfmodel.build_model_from_text import build_and_save_model_from_card_file
+        output_path = build_and_save_model_from_card_file(args.input_card, args.output_file)
+        print(f"Saved FitModel to {output_path}")
+        return
+
+    if args.command == "load":
+        from hfmodel.load_model import load_and_summarize_model
+        summary = load_and_summarize_model(args.model_file, verbose=args.verbose)
+        print(f"Loaded model from {summary['model_path']}")
+        print(f"Model name: {summary['model_name']}")
+        print(f"Observable range: {summary['obs_range']}")
+        if summary.get("channels"):
+            print(f"Channels: {', '.join(summary['channels'])}")
+        print(f"Processes: {summary['processes']}")
+        print(f"Signal process: {summary['signal_process']}")
+        if summary.get("poi_name") is not None:
+            print(f"POI name: {summary['poi_name']}")
+        print(f"Constraints: {summary['constraints']}")
+        print(f"Floating params: {summary['floating_params']}")
+        if summary.get("observed_count") is not None:
+            print(f"Observed data count: {summary['observed_count']}")
+        if summary.get("pdf_lines"):
+            print("PDFs and variables:")
+            for line in summary["pdf_lines"]:
+                print(line)
+        return
+
+    if args.command == "analyze":
+        from hfmodel.analyze_model import run_analysis_cli
+        run_analysis_cli(args)
+        return
+
+    parser.error(f"Unknown command: {args.command}")
+
+
+if __name__ == "__main__":
+    main()
