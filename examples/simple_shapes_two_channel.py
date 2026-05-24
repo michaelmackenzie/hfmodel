@@ -46,16 +46,13 @@ workspace_dict = {
                             "name": "signal_shape_syst",
                             "type": "histosys",
                             "data": {"hi_data": sig_shape_1_hi, "lo_data": sig_shape_1_lo},
-                        },
-                        {"name": "lumi_correlated_rate", "type": "normsys", "data": {"hi": 1.02, "lo": 0.98}},
+                        }
                     ],
                 },
                 {
                     "name": "background",
                     "data": bkg_shape_1.tolist(),
                     "modifiers": [
-                        {"name": "lumi_correlated_rate", "type": "normsys", "data": {"hi": 1.05, "lo": 0.95}},
-                        {"name": "bkg_uncorr_rate", "type": "staterror", "data": bkg_uncorr_err_1},
                     ],
                 },
             ],
@@ -72,16 +69,13 @@ workspace_dict = {
                             "name": "signal_shape_syst",
                             "type": "histosys",
                             "data": {"hi_data": sig_shape_2_hi, "lo_data": sig_shape_2_lo},
-                        },
-                        {"name": "lumi_correlated_rate", "type": "normsys", "data": {"hi": 1.02, "lo": 0.98}},
+                        }
                     ],
                 },
                 {
                     "name": "background",
                     "data": bkg_shape_2.tolist(),
                     "modifiers": [
-                        {"name": "lumi_correlated_rate", "type": "normsys", "data": {"hi": 1.05, "lo": 0.95}},
-                        {"name": "bkg_uncorr_rate", "type": "staterror", "data": bkg_uncorr_err_2},
                     ],
                 },
             ],

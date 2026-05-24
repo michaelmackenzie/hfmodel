@@ -1,0 +1,16 @@
+# Auto-generated hfmodel card converted from a Combine card
+shapes * * shapes/workspace_mumem_20_r0102.json
+shapes data_obs * shapes/workspace_mumem_20_r0102.json
+
+bin         obs_20     obs_20     obs_20     obs_20     obs_20     obs_20    
+process     mumem_20_signal_pdf mumem_20_dio_pdf mumem_20_cosmic_pdf mumem_20_rpc_ext_pdf mumem_20_rpc_int_pdf mumem_20_pbar_pdf
+process     0          1          1          1          1          1         
+rate        0.5035     27.3073    31.7433    0.0007     0.0010     0.0219    
+observation obs_20 58
+
+lumi        lnN        1.100      1.100      -          1.100      1.100      1.100     
+csmN        lnN        -          -          1.200      -          -          -         
+dioN        lnN        -          1.025      -          -          -          -         
+rpcN        lnN        -          -          -          1.270      1.270      -         
+pbrN        lnN        -          -          -          -          -          2.000     
+Scale       shape      1          1          1          -          -          -         
