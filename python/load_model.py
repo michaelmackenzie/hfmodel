@@ -19,6 +19,40 @@ def _format_parameter_entry(param_set):
     return ", ".join(fields)
 
 
+def _parset_metadata(parset):
+    if parset is None:
+        return {
+            "n_parameters": None,
+            "inits": None,
+            "bounds": None,
+            "fixed": None,
+            "constrained": None,
+            "pdf_type": None,
+            "auxdata": None,
+            "kind": None,
+        }
+
+    def _maybe_value(attr_name):
+        value = getattr(parset, attr_name, None)
+        if callable(value):
+            try:
+                return value()
+            except Exception:
+                return None
+        return value
+
+    return {
+        "n_parameters": _maybe_value("n_parameters"),
+        "inits": _maybe_value("suggested_init"),
+        "bounds": _maybe_value("suggested_bounds"),
+        "fixed": _maybe_value("suggested_fixed"),
+        "constrained": _maybe_value("constrained"),
+        "pdf_type": _maybe_value("pdf_type"),
+        "auxdata": _maybe_value("auxdata"),
+        "kind": type(parset).__name__,
+    }
+
+
 def load_and_summarize_model(model_file: str, verbose: int = 0):
     model_path = os.path.abspath(model_file)
     fit_model = load_fit_model(model_path)
@@ -37,9 +71,40 @@ def load_and_summarize_model(model_file: str, verbose: int = 0):
 
     detail_lines = []
     if verbose:
-        detail_lines.append("Parameter sets:")
-        for parameter_set in config.par_map.values():
-            detail_lines.append(f"  - {_format_parameter_entry(parameter_set)}")
+        init_all = list(config.suggested_init())
+        bounds_all = list(config.suggested_bounds())
+        fixed_all = list(suggested_fixed) if isinstance(suggested_fixed, (list, tuple)) else [None] * len(config.par_order)
+
+        detail_lines.append("Parameters:")
+        for idx, par_name in enumerate(config.par_order):
+            entry = config.par_map.get(par_name, {}) if isinstance(config.par_map, dict) else {}
+            parset = entry.get("paramset") if isinstance(entry, dict) else None
+            meta = _parset_metadata(parset)
+
+            kind_bits = []
+            if meta.get("kind"):
+                kind_bits.append(meta["kind"])
+            if meta.get("pdf_type"):
+                kind_bits.append(str(meta["pdf_type"]))
+            kind_label = "/".join(kind_bits) if kind_bits else "unknown"
+
+            init_val = init_all[idx] if idx < len(init_all) else None
+            bounds_val = bounds_all[idx] if idx < len(bounds_all) else None
+            fixed_val = fixed_all[idx] if idx < len(fixed_all) else None
+
+            detail_lines.append(
+                f"  - {par_name}: init={init_val}, bounds={bounds_val}, fixed={fixed_val}, kind={kind_label}"
+            )
+
+        if verbose >= 2:
+            detail_lines.append("Parameter-set internals:")
+            for par_name in config.par_order:
+                entry = config.par_map.get(par_name, {}) if isinstance(config.par_map, dict) else {}
+                parset = entry.get("paramset") if isinstance(entry, dict) else None
+                meta = _parset_metadata(parset)
+                detail_lines.append(
+                    f"  - {par_name}: n={meta.get('n_parameters')}, constrained={meta.get('constrained')}, auxdata={meta.get('auxdata')}"
+                )
 
     signal_processes = list(getattr(fit_model, "signal_processes", []))
     signal_text = ", ".join(signal_processes) if signal_processes else "none"
