@@ -7,9 +7,8 @@ import numpy as np
 import pyhf
 
 
-def configure_runtime(fit_model, toys):
-    _ = fit_model
-    _ = toys
+def configure_runtime():
+    return None
 
 
 def _override_vectors(model, fit_model):
@@ -561,12 +560,47 @@ def _interpolate_upper_limit(scan_pois, scan_values, alpha):
     return float(x0 + frac * (x1 - x0))
 
 
-def _compute_cls_summary(model, data, alpha, scan_max, scan_points, init_pars, par_bounds, fixed_params):
+def _resolve_cls_poi_scan_max(
+    model,
+    par_bounds,
+    requested_poi_scan_max,
+    cls_smart_scan=False,
+    poi_fit=None,
+    poi_unc=None,
+):
+    poi_index = int(model.config.poi_index)
+    default_high = 5.0
+    if poi_index < len(par_bounds):
+        default_high = float(par_bounds[poi_index][1])
+
+    if requested_poi_scan_max is not None:
+        requested = float(requested_poi_scan_max)
+        if np.isfinite(default_high):
+            requested = min(requested, default_high)
+        return float(max(0.0, requested))
+
+    if bool(cls_smart_scan):
+        if poi_fit is not None and poi_unc is not None:
+            muhat = float(poi_fit)
+            sigma = float(poi_unc)
+            if np.isfinite(muhat) and np.isfinite(sigma) and sigma > 0.0:
+                smart_high = max(0.0, muhat) + 5.0 * sigma
+                if np.isfinite(default_high):
+                    smart_high = min(smart_high, default_high)
+                if smart_high > 0.0:
+                    return float(smart_high)
+
+    if np.isfinite(default_high):
+        return float(max(0.0, default_high))
+    return 5.0
+
+
+def _compute_cls_summary(model, data, alpha, poi_scan_max, scan_points, init_pars, par_bounds, fixed_params):
     points = int(scan_points) if scan_points is not None else 21
     if points < 3:
         points = 3
 
-    poi_scan_max = float(scan_max) if scan_max is not None else 5.0
+    poi_scan_max = float(poi_scan_max)
     poi_scan = np.linspace(0.0, poi_scan_max, points)
 
     observed_vals = []
@@ -608,6 +642,7 @@ def _compute_cls_summary(model, data, alpha, scan_max, scan_points, init_pars, p
         "cls_expected_quantiles": quantiles,
         "cls_scan_points": points,
         "cls_scan_max": poi_scan_max,
+        "cls_alpha" : alpha,
         "cls_curve": {
             "pois": poi_scan.tolist(),
             "observed": [float(x) for x in observed_vals],
@@ -786,7 +821,7 @@ def _compute_feldman_cousins_summary(
     }
 
 
-def _compute_delta_nll_scan(model, data, bestfit, init_pars, par_bounds, fixed_params, scan_max, scan_points):
+def _compute_delta_nll_scan(model, data, bestfit, init_pars, par_bounds, fixed_params, poi_scan_max, scan_points):
     poi_index = int(model.config.poi_index)
     poi_name = str(model.config.poi_name)
     low, high = par_bounds[poi_index]
@@ -794,8 +829,8 @@ def _compute_delta_nll_scan(model, data, bestfit, init_pars, par_bounds, fixed_p
     high = float(high)
 
     muhat = float(bestfit[poi_index]) if np.isfinite(bestfit[poi_index]) else low
-    if scan_max is not None:
-        upper = min(float(scan_max), high)
+    if poi_scan_max is not None:
+        upper = min(float(poi_scan_max), high)
     else:
         upper = min(high, max(muhat * 2.0 + 1.0, 1.0))
 
@@ -934,15 +969,8 @@ def run_analysis(
     use_asimov_data,
     cls_alpha,
     signal_strength,
-    scan_max,
-    fit_mode,
-    binned_bins,
     cls_scan_points,
     cls_smart_scan,
-    profile_scan,
-    poi_name,
-    promote_poi,
-    poi_scan_points,
     poi_scan_max,
     feldman_cousins_alpha,
     feldman_cousins_scan_points,
@@ -959,17 +987,6 @@ def run_analysis(
     backend_name="scipy",
     hessian_method="auto",
 ):
-    _ = fit_mode
-    _ = binned_bins
-    _ = cls_smart_scan
-    _ = profile_scan
-    _ = poi_name
-    _ = promote_poi
-    _ = poi_scan_points
-    _ = poi_scan_max
-    _ = compute_nll_scan
-    _ = nll_scan_points
-
     model = fit_model.model
     init_pars, par_bounds, fixed_params = _override_vectors(model, fit_model)
 
@@ -986,7 +1003,7 @@ def run_analysis(
         "mode": "observed" if use_observed_data else ("asimov" if use_asimov_data else "toy"),
         "cls_alpha": cls_alpha,
         "signal_strength": signal_strength,
-        "scan_max": scan_max,
+        "poi_scan_max": poi_scan_max,
     }
 
     start = int(resume_from_index)
@@ -1091,11 +1108,19 @@ def run_analysis(
 
         if cls_alpha is not None and fit_error is None:
             try:
+                cls_poi_scan_max = _resolve_cls_poi_scan_max(
+                    model=model,
+                    par_bounds=par_bounds,
+                    requested_poi_scan_max=poi_scan_max,
+                    cls_smart_scan=cls_smart_scan,
+                    poi_fit=(bestfit[poi_index] if np.isfinite(bestfit[poi_index]) else None),
+                    poi_unc=poi_unc,
+                )
                 cls_summary = _compute_cls_summary(
                     model=model,
                     data=data,
                     alpha=float(cls_alpha),
-                    scan_max=scan_max,
+                    poi_scan_max=cls_poi_scan_max,
                     scan_points=cls_scan_points,
                     init_pars=init_pars,
                     par_bounds=par_bounds,
@@ -1116,7 +1141,7 @@ def run_analysis(
                     init_pars=init_pars,
                     par_bounds=par_bounds,
                     fixed_params=fixed_params,
-                    scan_max=scan_max,
+                    poi_scan_max=poi_scan_max,
                     scan_points=nll_scan_points,
                 )
             except Exception as exc:

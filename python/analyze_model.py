@@ -170,7 +170,7 @@ def _save_analysis_snapshot(output_path, fit_model, summaries, args):
             "jobs": args.jobs,
             "cls_alpha": args.cls,
             "signal_strength": args.signal_strength,
-            "scan_max": args.scan_max,
+            "poi_scan_max": args.poi_scan_max,
             "cls_scan_points": args.cls_scan_points,
             "plot": bool(args.plot),
             "plot_dir": args.plot_dir,
@@ -193,10 +193,6 @@ def run_analysis_cli(args):
         raise ValueError(
             "--resume-from is not implemented in the pyhf analysis backend yet. "
             "Run without resume or use checkpoint JSON outputs as external bookkeeping."
-        )
-    if args.fit_mode == "unbinned":
-        raise ValueError(
-            "--fit-mode unbinned is not supported in pyhf mode. Use --fit-mode auto or --fit-mode binned."
         )
 
     backend = _configure_pyhf_backend(args.backend)
@@ -229,7 +225,7 @@ def run_analysis_cli(args):
     if int(getattr(args, "jobs", 1) or 1) > 1:
         print("Note: pyhf analysis currently runs sequentially; --jobs is not yet used.")
 
-    configure_runtime(fit_model, n_toys)
+    configure_runtime()
 
     total_start = time.perf_counter()
     summaries = run_analysis(
@@ -239,15 +235,8 @@ def run_analysis_cli(args):
         use_asimov_data=use_asimov_data,
         cls_alpha=args.cls,
         signal_strength=args.signal_strength,
-        scan_max=args.scan_max,
-        fit_mode=args.fit_mode,
-        binned_bins=args.binned_bins,
         cls_scan_points=args.cls_scan_points,
         cls_smart_scan=args.cls_smart_scan,
-        profile_scan=args.profile_scan,
-        poi_name=args.poi_name,
-        promote_poi=args.promote_poi,
-        poi_scan_points=args.poi_scan_points,
         poi_scan_max=args.poi_scan_max,
         feldman_cousins_alpha=args.feldman_cousins,
         feldman_cousins_scan_points=args.fc_scan_points,

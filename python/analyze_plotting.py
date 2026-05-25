@@ -194,7 +194,7 @@ def _plot_delta_nll(summary, plot_dir):
     plt.close(fig)
 
 
-def _plot_cls_brazil(summary, plot_dir):
+def _plot_cls_band(summary, plot_dir):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -203,6 +203,7 @@ def _plot_cls_brazil(summary, plot_dir):
     cls_curve = summary.get("cls_curve", {})
     if not isinstance(cls_curve, dict):
         return
+    ref_value = summary.get("cls_alpha", 0.05)
 
     pois = np.asarray(cls_curve.get("pois", []), dtype=float)
     obs = np.asarray(cls_curve.get("observed", []), dtype=float)
@@ -215,6 +216,7 @@ def _plot_cls_brazil(summary, plot_dir):
     has_band = band.ndim == 2 and band.shape[0] == pois.size and band.shape[1] >= 5
 
     fig, ax = plt.subplots(figsize=(7.5, 5.5))
+    ax.set_axisbelow(True)
 
     if has_band:
         low2 = band[:, 0]
@@ -223,10 +225,15 @@ def _plot_cls_brazil(summary, plot_dir):
         high2 = band[:, 4]
         valid2 = np.isfinite(pois) & np.isfinite(low2) & np.isfinite(high2)
         valid1 = np.isfinite(pois) & np.isfinite(low1) & np.isfinite(high1)
+        # #4CBB17 (Deep Lime / Standard HEP Green)
+        # #2CA02C (Matplotlib Tab Green)
+        # (Yellow): #FFFF00 #FFE08A
+        # #FFCD00 (Gold / Standard CERN Yellow)
+        # #FFD700 (Web Gold)
         if np.any(valid2):
-            ax.fill_between(pois[valid2], low2[valid2], high2[valid2], color="#FFE08A", alpha=0.7, label=r"Expected $\pm2\sigma$")
+            ax.fill_between(pois[valid2], low2[valid2], high2[valid2], color="#FFD700", alpha=1., label=r"Expected $\pm2\sigma$")
         if np.any(valid1):
-            ax.fill_between(pois[valid1], low1[valid1], high1[valid1], color="#A1D99B", alpha=0.8, label=r"Expected $\pm1\sigma$")
+            ax.fill_between(pois[valid1], low1[valid1], high1[valid1], color="#4CBB17", alpha=1., label=r"Expected $\pm1\sigma$")
 
     valid_exp = np.isfinite(pois) & np.isfinite(exp_median)
     if np.any(valid_exp):
@@ -236,15 +243,15 @@ def _plot_cls_brazil(summary, plot_dir):
     if np.any(valid_obs):
         ax.plot(pois[valid_obs], obs[valid_obs], color="#1F77B4", linewidth=2.0, label="Observed")
 
-    ax.axhline(0.05, color="#CC4C02", linestyle=":", linewidth=1.5, label=r"$CL_s = 0.05$")
+    ax.axhline(ref_value, color="#CC4C02", linestyle=":", linewidth=1.5, label=f"$CL_s = {ref_value}$")
     ax.set_xlabel(summary.get("poi_name", "POI"))
     ax.set_ylabel(r"$CL_s$")
-    ax.set_title("CLs Brazil Plot")
+    ax.set_title("CLs Plot")
     ax.grid(alpha=0.25)
     ax.legend(loc="best")
 
     plt.tight_layout()
-    out = os.path.join(plot_dir, f"dataset_{summary.get('dataset_id', 0)}_cls_brazil.png")
+    out = os.path.join(plot_dir, f"dataset_{summary.get('dataset_id', 0)}_cls_band.png")
     plt.savefig(out, dpi=150)
     plt.close(fig)
 
@@ -379,5 +386,5 @@ def plot_summary_artifacts(summaries, fit_model, plot_dir, binned_bins):
     if summaries:
         _plot_first_dataset_channels(summaries[0], plot_dir)
         _plot_delta_nll(summaries[0], plot_dir)
-        _plot_cls_brazil(summaries[0], plot_dir)
+        _plot_cls_band(summaries[0], plot_dir)
         _plot_feldman_cousins_construction(summaries[0], plot_dir)

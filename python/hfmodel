@@ -23,11 +23,13 @@ def _print_startup_header():
     from hfmodel import __version__ as hfmodel_version
 
     pyhf_version = _package_version("pyhf")
-    version_string = f"* hfmodel {hfmodel_version} | pyhf {pyhf_version} *"
-    print('*' * len(version_string), flush=True)
-    print('*' + 'hfmodel statistical analysis'.center(len(version_string) - 2) + '*', flush=True)
-    print(version_string, flush=True)
-    print('*' * len(version_string), flush=True)
+    title = 'hfmodel statistical analysis'
+    version_string = f"hfmodel {hfmodel_version} | pyhf {pyhf_version}"
+    width = max(len(title), len(version_string)) + 4
+    print('*' * width, flush=True)
+    print('*' + title.center(width - 2) + '*', flush=True)
+    print('*' + version_string.center(width - 2) + '*', flush=True)
+    print('*' * width, flush=True)
 
 
 def _add_analyze_arguments(parser):
@@ -85,7 +87,6 @@ def _add_analyze_arguments(parser):
     )
     parser.add_argument("--cls", type=float, default=None, help="If set, compute the CLs upper limit for this alpha value")
     parser.add_argument("--signal-strength", type=float, default=None, help="Override the signal strength before generating toys")
-    parser.add_argument("--scan-max", type=float, default=None, help="Override the maximum signal scan value for CLs")
     parser.add_argument(
         "--cls-scan-points",
         type=int,
@@ -96,12 +97,6 @@ def _add_analyze_arguments(parser):
         "--cls-smart-scan",
         action="store_true",
         help="Adaptively refine the CLs scan range and granularity around the limit",
-    )
-    parser.add_argument(
-        "--fit-mode",
-        choices=("auto", "binned"),
-        default="auto",
-        help="Likelihood type: auto (default) or binned",
     )
     parser.add_argument(
         "--binned-bins",
@@ -122,31 +117,10 @@ def _add_analyze_arguments(parser):
         help="Resume analysis from a previous checkpoint file (loads completed datasets and continues from index N+1)",
     )
     parser.add_argument(
-        "--profile-scan",
-        action="store_true",
-        help="For counting+binned fits, run a profile-likelihood scan over the POI instead of full minimization",
-    )
-    parser.add_argument(
-        "--poi-name",
-        default=None,
-        help="Optional parameter name to treat as parameter of interest (POI) for --profile-scan",
-    )
-    parser.add_argument(
-        "--promote-poi",
-        action="store_true",
-        help="If --poi-name points to a fixed parameter, set it floating so it can be used as POI",
-    )
-    parser.add_argument(
-        "--poi-scan-points",
-        type=int,
-        default=41,
-        help="Number of scan points for --profile-scan",
-    )
-    parser.add_argument(
         "--poi-scan-max",
         type=float,
         default=None,
-        help="Optional upper edge for POI scan (lower edge uses POI lower bound/default)",
+        help="Upper edge for POI scans (used by CLs and profile scans; defaults to POI upper bound)",
     )
     parser.add_argument(
         "--plot",

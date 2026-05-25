@@ -36,7 +36,7 @@ pyenv rootana 2.5.0
 
 ## Usage
 
-User-facing tool tools are organized under `bin/`:
+User-facing tools are organized under `bin/`:
 
 - `bin/hfmodel` for build/load/analyze
 - `bin/plot_analysis.py` for plotting from snapshots
@@ -62,7 +62,20 @@ hfmodel analyze --model-file model.json --toys -1
 hfmodel analyze --model-file model.json --toys -1 --feldman-cousins 0.1 --fc-toys 50
 ```
 
-Each analysis run now also writes an ensemble evaluation report in JSON format. By default the file is derived from `--output`, for example `analysis_output_ensemble_report.json`. Use `--report-file` to choose a custom path.
+Useful `analyze` options:
+
+- `--cls ALPHA`: compute CLs upper limits.
+- `--poi-scan-max X`: set the upper edge used for POI scans (CLs scan and profile-NLL scan).
+- `--cls-smart-scan`: if `--poi-scan-max` is not provided, choose a CLs POI scan max from the fitted POI uncertainty (bounded by the POI upper range).
+- Default CLs scan max without `--poi-scan-max`: the model POI upper bound.
+- `--plot`: produce summary plots and include a profile-NLL scan payload in the first analyzed dataset.
+- `--checkpoint-freq N`: write periodic checkpoint files during large toy ensembles.
+
+Analysis outputs:
+
+- Snapshot JSON: path from `--output` (default `analysis_output.json`).
+- Ensemble report JSON: derived from `--output` by default (e.g. `analysis_output_ensemble_report.json`), or set with `--report-file`.
+- Optional checkpoint JSON: `<output>.checkpoint.json` when `--checkpoint-freq` is set.
 
 Generate plots from a saved analysis snapshot:
 
